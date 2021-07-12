@@ -1,16 +1,17 @@
+extern crate pretty_env_logger;
 use actix_web::{get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use actix_web::client::Client;
-use actix_web::client::SendRequestError;
+use log::{error, info};
 
 use backend::models::{PeopleResponse};
 
 
 #[get("/people")]
-async fn get_people(req: HttpRequest) -> impl Responder {
+async fn get_people(_req: HttpRequest) -> impl Responder {
     let bearer_token = match dotenv::var("SALESLOFT_APPLICATION_SECRET") {
         Ok(token) => token,
         Err(err) => {
-            eprintln!("an error occurred: {}", err);
+            error!("Failed to get API token: {}", err);
             return HttpResponse::InternalServerError().finish();
         }
     };
@@ -23,15 +24,15 @@ async fn get_people(req: HttpRequest) -> impl Responder {
     
     let people_data: PeopleResponse = match people_result {
         Err(err) => {
-            eprintln!("an error occurred: {}", err);
+            eprintln!("Failed to request people from API: {}", err);
             return HttpResponse::ServiceUnavailable().finish()
         }
         Ok(mut people) => {
             match people.json().await {
                 Err(err) => {
-                    eprintln!("an error occurred: {}", err);
+                    error!("Failed to deserialize API response: {}", err);
                     return HttpResponse::ServiceUnavailable().finish();
-                }
+                },
                 Ok(people) => people
             }
         }
@@ -42,6 +43,8 @@ async fn get_people(req: HttpRequest) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    pretty_env_logger::init();
+
     HttpServer::new(|| {
         App::new()
             .service(get_people)
