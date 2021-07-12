@@ -1,13 +1,12 @@
 extern crate pretty_env_logger;
-use actix_web::{get, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use actix_web::client::Client;
-use log::{error, info};
+use log::{error};
 
 use backend::models::{PeopleResponse};
 
 
-#[get("/people")]
-async fn get_people(_req: HttpRequest) -> impl Responder {
+async fn get_people(_req: HttpRequest) -> HttpResponse {
     let bearer_token = match dotenv::var("SALESLOFT_APPLICATION_SECRET") {
         Ok(token) => token,
         Err(err) => {
@@ -47,9 +46,30 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            .service(get_people)
+            .route("/people", web::get().to(get_people))
     })
     .bind("0.0.0.0:8080")?
     .run()
     .await
+}
+
+mod tests {
+    use super::*;
+    use actix_web::{http, test};
+
+    #[actix_rt::test]
+    async fn test_get_people_ok() {
+        let req = test::TestRequest::get().to_http_request();
+        let resp = get_people(req).await;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn test_get_people_not_empty() {
+        let req = test::TestRequest::get().to_http_request();
+        let resp = get_people(req).await;
+        
+        let people_body = resp.body();
+        assert!(people_body.as_ref().is_some());
+    }
 }
